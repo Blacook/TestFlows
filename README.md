@@ -61,8 +61,8 @@ chmod +x scripts/validate-config.sh
 
 ### 3. デプロイ
 ```bash
-chmod +x simple-deploy.sh
-./simple-deploy.sh
+chmod +x scripts/deploy.sh
+./scripts/deploy.sh
 ```
 
 デプロイ処理:
