@@ -113,18 +113,23 @@ https://console.aws.amazon.com/bedrock/home?region=<REGION>#/flows/<FLOW_ID>
 ## ファイル構成
 
 ```
-bedrock-flows-project/
+TestFlows/
 ├── config/
 │   ├── flow-template.json      # フロー定義テンプレート（環境変数展開用）
 │   └── iam-policies.json       # IAMロール・ポリシー定義
 ├── scripts/
+│   ├── deploy.sh               # メインデプロイスクリプト
 │   ├── validate-config.sh      # 設定検証スクリプト
+│   ├── export-flow.sh          # フローエクスポートスクリプト
 │   └── cleanup.sh              # リソース削除スクリプト
-├── knowledge-base-data/
-│   └── error-patterns.md       # ナレッジベース用サンプルデータ
+├── data/
+│   ├── error-patterns.md       # ナレッジベース用サンプルデータ
+│   └── sample-test-log.log     # テスト用サンプルログ
+├── docs/
+│   └── model-configuration.md  # モデル設定ドキュメント
 ├── .env.example                # 環境変数テンプレート
+├── .env                        # 環境変数設定（デプロイ時に作成）
 ├── flow-definition.json        # 実際のフロー定義（デプロイ時に生成）
-├── simple-deploy.sh            # メインデプロイスクリプト
 └── README.md                   # このファイル
 ```
 
@@ -138,13 +143,15 @@ bedrock-flows-project/
 
 **スクリプト:**
 
-- `simple-deploy.sh`: ワンコマンドデプロイスクリプト
+- `scripts/deploy.sh`: ワンコマンドデプロイスクリプト
 - `scripts/validate-config.sh`: デプロイ前の設定検証
+- `scripts/export-flow.sh`: 既存フローのエクスポート
 - `scripts/cleanup.sh`: 作成したリソースの一括削除
 
 **データ:**
 
-- `knowledge-base-data/error-patterns.md`: よくあるエラーパターンと対処法のサンプル
+- `data/error-patterns.md`: よくあるエラーパターンと対処法のサンプル
+- `data/sample-test-log.log`: テスト実行用のサンプルログファイル
 
 ## 環境変数設定
 
@@ -160,14 +167,18 @@ bedrock-flows-project/
 
 ### オプション設定（推奨値）
 
-| 変数名                 | 説明                         | デフォルト値                             |
-| ---------------------- | ---------------------------- | ---------------------------------------- |
-| `BEDROCK_MODEL_ID`     | 使用する Bedrock モデル      | `anthropic.claude-3-haiku-20240307-v1:0` |
-| `MAX_TOKENS_ANALYZER`  | ログ分析の最大トークン数     | `3000`                                   |
-| `MAX_TOKENS_EXTRACTOR` | エラー抽出の最大トークン数   | `2000`                                   |
-| `MAX_TOKENS_REPORT`    | レポート生成の最大トークン数 | `4000`                                   |
-| `TEMPERATURE`          | モデルの温度パラメータ       | `0.1`                                    |
-| `TOP_P`                | モデルの Top-P パラメータ    | `0.9`                                    |
+| 変数名                    | 説明                         | デフォルト値                             |
+| ------------------------- | ---------------------------- | ---------------------------------------- |
+| `MODEL_ID_ANALYZER`       | ログ分析用モデル             | `us.amazon.nova-pro-v1:0`                |
+| `MODEL_ID_EXTRACTOR`      | エラー抽出用モデル           | `us.amazon.nova-micro-v1:0`              |
+| `MODEL_ID_QUERY_GENERATOR`| クエリ生成用モデル           | `us.amazon.nova-lite-v1:0`               |
+| `MODEL_ID_REPORT`         | レポート生成用モデル         | `us.amazon.nova-pro-v1:0`                |
+| `MODEL_ID_KNOWLEDGE_BASE` | Knowledge Base検索用モデル   | `anthropic.claude-3-haiku-20240307-v1:0` |
+| `MAX_TOKENS_ANALYZER`     | ログ分析の最大トークン数     | `3000`                                   |
+| `MAX_TOKENS_EXTRACTOR`    | エラー抽出の最大トークン数   | `2000`                                   |
+| `MAX_TOKENS_REPORT`       | レポート生成の最大トークン数 | `4000`                                   |
+| `TEMPERATURE`             | モデルの温度パラメータ       | `0.1`                                    |
+| `TOP_P`                   | モデルの Top-P パラメータ    | `0.9`                                    |
 
 ## 入力・出力形式
 
@@ -224,6 +235,40 @@ Markdown 形式のサマリーレポート:
 - データベース認証情報の確認と修正
 ```
 
+## フローのエクスポート
+
+既存のBedrock Flowsをエクスポートしてバックアップや移行に使用できます。
+
+### エクスポート方法
+
+```bash
+chmod +x scripts/export-flow.sh
+
+# .envにFLOW_IDが設定されている場合
+./scripts/export-flow.sh
+
+# Flow IDを直接指定する場合
+./scripts/export-flow.sh <FLOW_ID>
+
+# 出力ファイル名を指定する場合
+./scripts/export-flow.sh <FLOW_ID> my-flow-backup.json
+```
+
+### 既存フローの確認
+
+```bash
+# 利用可能なFlow一覧を表示
+aws bedrock-agent list-flows \
+  --region us-east-1 \
+  --query 'flowSummaries[*].[id,name,status,createdAt]' \
+  --output table
+```
+
+### エクスポートされるファイル
+
+- `exported-flow-YYYYMMDD-HHMMSS.json`: フロー定義
+- `flow-metadata-YYYYMMDD-HHMMSS.json`: フローのメタデータ（名前、ステータス等）
+
 ## Knowledge Base の準備
 
 このフローは既存の Knowledge Base を使用します。Knowledge Base には以下のようなデータを登録してください:
@@ -236,7 +281,7 @@ Markdown 形式のサマリーレポート:
 
 ### サンプルデータ
 
-`knowledge-base-data/error-patterns.md`にサンプルデータがあります。
+`data/error-patterns.md`にサンプルデータがあります。
 
 **含まれる内容:**
 
