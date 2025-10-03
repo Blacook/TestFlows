@@ -33,7 +33,7 @@
                     ]
                   }
                 },
-                "modelId": "${BEDROCK_MODEL_ID}",
+                "modelId": "${MODEL_ID_ANALYZER}",
                 "inferenceConfiguration": {
                   "text": {
                     "maxTokens": ${MAX_TOKENS_ANALYZER},
@@ -75,7 +75,7 @@
                     ]
                   }
                 },
-                "modelId": "${BEDROCK_MODEL_ID}",
+                "modelId": "${MODEL_ID_EXTRACTOR}",
                 "inferenceConfiguration": {
                   "text": {
                     "maxTokens": ${MAX_TOKENS_EXTRACTOR},
@@ -102,12 +102,54 @@
         ]
       },
       {
+        "name": "QueryGenerator",
+        "type": "Prompt",
+        "configuration": {
+          "prompt": {
+            "sourceConfiguration": {
+              "inline": {
+                "templateType": "TEXT",
+                "templateConfiguration": {
+                  "text": {
+                    "text": "以下のエラー情報から、ナレッジベース検索用の簡潔なクエリを生成してください。\n\nエラー情報:\n{{extracted_errors}}\n\n以下の形式で出力してください（100文字以内）:\nエラータイプ1 エラータイプ2 主要なキーワード",
+                    "inputVariables": [
+                      {"name": "extracted_errors"}
+                    ]
+                  }
+                },
+                "modelId": "${MODEL_ID_QUERY_GENERATOR}",
+                "inferenceConfiguration": {
+                  "text": {
+                    "maxTokens": 200,
+                    "temperature": 0.1,
+                    "topP": 0.9
+                  }
+                }
+              }
+            }
+          }
+        },
+        "inputs": [
+          {
+            "expression": "$.data",
+            "name": "extracted_errors",
+            "type": "String"
+          }
+        ],
+        "outputs": [
+          {
+            "name": "modelCompletion",
+            "type": "String"
+          }
+        ]
+      },
+      {
         "name": "KnowledgeBaseSearch",
         "type": "KnowledgeBase",
         "configuration": {
           "knowledgeBase": {
             "knowledgeBaseId": "${KNOWLEDGE_BASE_ID}",
-            "modelId": "${BEDROCK_MODEL_ID}"
+            "modelId": "${MODEL_ID_KNOWLEDGE_BASE}"
           }
         },
         "inputs": [
@@ -142,7 +184,7 @@
                     ]
                   }
                 },
-                "modelId": "${BEDROCK_MODEL_ID}",
+                "modelId": "${MODEL_ID_REPORT}",
                 "inferenceConfiguration": {
                   "text": {
                     "maxTokens": ${MAX_TOKENS_REPORT},
@@ -243,9 +285,21 @@
         }
       },
       {
-        "name": "ExtractorToKnowledgeBase",
+        "name": "ExtractorToQueryGenerator",
         "type": "Data",
         "source": "ErrorExtractor",
+        "target": "QueryGenerator",
+        "configuration": {
+          "data": {
+            "sourceOutput": "modelCompletion",
+            "targetInput": "extracted_errors"
+          }
+        }
+      },
+      {
+        "name": "QueryGeneratorToKnowledgeBase",
+        "type": "Data",
+        "source": "QueryGenerator",
         "target": "KnowledgeBaseSearch",
         "configuration": {
           "data": {
