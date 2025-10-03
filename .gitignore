@@ -144,6 +144,7 @@ venv/
 ENV/
 env.bak/
 venv.bak/
+flow-definition.json
 .DS_Store
 
 # Spyder project settings
