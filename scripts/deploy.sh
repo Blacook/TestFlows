@@ -47,18 +47,23 @@ fi
 
 # 1. IAMロールの作成
 echo "🔐 IAMロールを作成中..."
-aws iam create-role \
-  --role-name "$EXECUTION_ROLE_NAME" \
-  --assume-role-policy-document file://config/iam-policies.json \
-  --query 'Role.Arn' \
-  --output text 2>/dev/null || echo "ロール '$EXECUTION_ROLE_NAME' は既に存在します"
+if aws iam get-role --role-name "$EXECUTION_ROLE_NAME" >/dev/null 2>&1; then
+    echo "ロール '$EXECUTION_ROLE_NAME' は既に存在します"
+else
+    aws iam create-role \
+      --role-name "$EXECUTION_ROLE_NAME" \
+      --assume-role-policy-document "$(jq -c '.trustPolicy' config/iam-policies.json)" \
+      --query 'Role.Arn' \
+      --output text
+    echo "✅ IAMロール '$EXECUTION_ROLE_NAME' を作成しました"
+fi
 
 # IAMポリシーのアタッチ
 echo "🔒 IAMポリシーをアタッチ中..."
 aws iam put-role-policy \
   --role-name "$EXECUTION_ROLE_NAME" \
   --policy-name "$EXECUTION_ROLE_POLICY_NAME" \
-  --policy-document file://config/iam-policies.json
+  --policy-document "$(jq -c '.executionPolicy' config/iam-policies.json)"
 
 echo "⏳ IAMロールの伝播を待機中（30秒）..."
 sleep 30
