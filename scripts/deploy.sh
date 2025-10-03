@@ -70,7 +70,19 @@ sleep 30
 
 # 2. フロー定義ファイルの生成
 echo "📝 フロー定義ファイルを生成中..."
-envsubst < config/flow-template.json > flow-definition.json
+python3 -c "
+import os
+import sys
+
+with open('config/flow-template.json', 'r') as f:
+    content = f.read()
+
+for key, value in os.environ.items():
+    content = content.replace(f'\${key}', value).replace(f'\${{{key}}}', value)
+
+with open('flow-definition.json', 'w') as f:
+    f.write(content)
+"
 
 # 3. Bedrock Flowの作成
 echo "🔄 Bedrock Flowを作成中..."
