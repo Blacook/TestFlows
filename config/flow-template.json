@@ -145,9 +145,10 @@
         "type": "Retrieval",
         "configuration": {
           "retrieval": {
-            "knowledgeBaseConfiguration": {
-              "knowledgeBaseId": "${KNOWLEDGE_BASE_ID}",
-              "modelId": "${BEDROCK_MODEL_ID}"
+            "serviceConfiguration": {
+              "retrieve": {
+                "knowledgeBaseId": "${KNOWLEDGE_BASE_ID}"
+              }
             }
           }
         },
@@ -161,7 +162,7 @@
         "outputs": [
           {
             "name": "output",
-            "type": "String"
+            "type": "Array"
           }
         ]
       },
