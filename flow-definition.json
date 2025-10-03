@@ -1,0 +1,294 @@
+{
+  "name": "test-log-analysis-flow",
+  "description": "テスト実行ログのRAG分析とサマリーレポート生成フロー（Bedrock専用構成）",
+  "executionRoleArn": "arn:aws:iam::ACCOUNT_ID:role/BedrockFlowExecutionRole",
+  "definition": {
+    "nodes": [
+      {
+        "name": "InputNode",
+        "type": "Input",
+        "configuration": {
+          "input": {
+            "expression": "$.log_content"
+          }
+        },
+        "outputs": [
+          {
+            "name": "document",
+            "type": "Object"
+          }
+        ]
+      },
+      {
+        "name": "LogAnalyzer",
+        "type": "Prompt",
+        "configuration": {
+          "sourceConfiguration": {
+            "inline": {
+              "templateType": "TEXT",
+              "templateConfiguration": {
+                "text": "以下のテストログを分析し、エラーと警告を抽出してください。\n\nログ内容:\n{{log_content}}\n\n以下の形式でJSON形式で出力してください:\n{\n  \"errors\": [\n    {\n      \"type\": \"エラータイプ\",\n      \"message\": \"エラーメッセージ\",\n      \"line\": \"該当行\",\n      \"severity\": \"Critical|High|Medium|Low\"\n    }\n  ],\n  \"warnings\": [\n    {\n      \"type\": \"警告タイプ\",\n      \"message\": \"警告メッセージ\",\n      \"line\": \"該当行\"\n    }\n  ],\n  \"summary\": {\n    \"total_errors\": 数値,\n    \"total_warnings\": 数値,\n    \"critical_issues\": 数値,\n    \"failed_tests\": [\"テスト名のリスト\"]\n  },\n  \"key_issues\": \"最も重要な問題の要約（200文字以内）\"\n}"
+              }
+            }
+          },
+          "inferenceConfiguration": {
+            "text": {
+              "maxTokens": 3000,
+              "temperature": 0.1,
+              "topP": 0.9
+            }
+          }
+        },
+        "inputs": [
+          {
+            "expression": "$.log_content",
+            "name": "log_content",
+            "type": "String"
+          }
+        ],
+        "outputs": [
+          {
+            "name": "analysis_result",
+            "type": "String"
+          }
+        ]
+      },
+      {
+        "name": "SeverityClassifier",
+        "type": "Condition",
+        "configuration": {
+          "conditions": [
+            {
+              "name": "Critical",
+              "expression": "$.analysis_result.contains('FATAL') || $.analysis_result.contains('Critical')"
+            },
+            {
+              "name": "High",
+              "expression": "$.analysis_result.contains('ERROR') || $.analysis_result.contains('Exception')"
+            },
+            {
+              "name": "Medium",
+              "expression": "$.analysis_result.contains('WARN') || $.analysis_result.contains('Timeout')"
+            },
+            {
+              "name": "Low",
+              "expression": "true"
+            }
+          ]
+        },
+        "inputs": [
+          {
+            "expression": "$.analysis_result",
+            "name": "analysis_result",
+            "type": "String"
+          }
+        ],
+        "outputs": [
+          {
+            "name": "severity_level",
+            "type": "String"
+          }
+        ]
+      },
+      {
+        "name": "ErrorExtractor",
+        "type": "Prompt",
+        "configuration": {
+          "sourceConfiguration": {
+            "inline": {
+              "templateType": "TEXT",
+              "templateConfiguration": {
+                "text": "以下の分析結果から、最も重要なエラーメッセージとスタックトレースを抽出してください。\n\n分析結果:\n{{analysis_result}}\n\n以下の条件で抽出してください:\n1. FATALやERRORレベルのメッセージを優先\n2. スタックトレースは最初の10行まで\n3. 重複するエラーは除外\n4. テスト失敗の直接的な原因となるエラーを重視\n\n出力形式:\n```\n【重要なエラー1】\nエラータイプ: \nメッセージ: \nスタックトレース: \n\n【重要なエラー2】\n...\n```"
+              }
+            }
+          },
+          "inferenceConfiguration": {
+            "text": {
+              "maxTokens": 2000,
+              "temperature": 0.1,
+              "topP": 0.9
+            }
+          }
+        },
+        "inputs": [
+          {
+            "expression": "$.analysis_result",
+            "name": "analysis_result",
+            "type": "String"
+          }
+        ],
+        "outputs": [
+          {
+            "name": "extracted_errors",
+            "type": "String"
+          }
+        ]
+      },
+      {
+        "name": "KnowledgeBaseSearch",
+        "type": "KnowledgeBase",
+        "configuration": {
+          "knowledgeBaseId": "KB_ID_PLACEHOLDER",
+          "modelId": "anthropic.claude-3-haiku-20240307-v1:0",
+          "retrievalConfiguration": {
+            "vectorSearchConfiguration": {
+              "numberOfResults": 5,
+              "overrideSearchType": "HYBRID"
+            }
+          },
+          "generationConfiguration": {
+            "promptTemplate": {
+              "textPromptTemplate": "以下のエラー情報を分析し、ナレッジベースから類似事例を検索して根本原因を推定してください。\n\n検索結果: $search_results$\n\nエラー情報: $query$\n\n以下の形式で回答してください:\n\n## 🔍 根本原因の推定\n- **主要な原因**: \n- **影響範囲**: \n- **緊急度**: Critical/High/Medium/Low\n\n## 📚 類似する過去事例\n- 事例1: \n- 事例2: \n\n## 🛠️ 推奨される対処法\n1. 即座に対応すべき項目\n2. 中長期的な改善項目\n3. 予防策\n\n## ⚠️ 注意点\n- リスク要因\n- 副作用の可能性"
+            }
+          }
+        },
+        "inputs": [
+          {
+            "expression": "$.extracted_errors",
+            "name": "query",
+            "type": "String"
+          }
+        ],
+        "outputs": [
+          {
+            "name": "root_cause_analysis",
+            "type": "String"
+          }
+        ]
+      },
+      {
+        "name": "ReportGenerator",
+        "type": "Prompt",
+        "configuration": {
+          "sourceConfiguration": {
+            "inline": {
+              "templateType": "TEXT",
+              "templateConfiguration": {
+                "text": "以下の情報を統合して、テスト実行結果の包括的なサマリーレポートをMarkdown形式で生成してください。\n\n## 入力データ\n- **ログ分析結果**: {{analysis_result}}\n- **重要度レベル**: {{severity_level}}\n- **抽出されたエラー**: {{extracted_errors}}\n- **根本原因分析**: {{root_cause_analysis}}\n\n## 出力形式\n以下のMarkdown形式で統一されたレポートを生成してください:\n\n# 🔍 テスト実行サマリーレポート\n\n**生成日時**: [現在時刻]\n**重要度**: {{severity_level}}\n\n## 📊 実行概要\n\n| 項目 | 値 |\n|------|----|\n| 総エラー数 | [分析結果から抽出] |\n| 総警告数 | [分析結果から抽出] |\n| 失敗テスト数 | [分析結果から抽出] |\n| 重要度 | {{severity_level}} |\n\n## 🚨 重要な問題\n\n{{extracted_errors}}\n\n## 🔍 根本原因分析\n\n{{root_cause_analysis}}\n\n## 📈 影響度評価\n\n- **システム影響**: [Critical/High/Medium/Low]\n- **ユーザー影響**: [分析結果に基づく評価]\n- **ビジネス影響**: [推定される影響]\n\n## 💡 推奨アクション\n\n### 🔥 緊急対応（24時間以内）\n- [最優先で対応すべき項目]\n\n### ⚡ 短期対応（1週間以内）\n- [短期で対応すべき項目]\n\n### 🔧 中長期対応（1ヶ月以内）\n- [継続的改善項目]\n\n## 📋 次回テスト時の注意点\n\n- [予防策や監視ポイント]\n\n---\n*このレポートはAmazon Bedrock Flowsによって自動生成されました*"
+              }
+            }
+          },
+          "inferenceConfiguration": {
+            "text": {
+              "maxTokens": 4000,
+              "temperature": 0.2,
+              "topP": 0.9
+            }
+          }
+        },
+        "inputs": [
+          {
+            "expression": "$.analysis_result",
+            "name": "analysis_result",
+            "type": "String"
+          },
+          {
+            "expression": "$.severity_level",
+            "name": "severity_level",
+            "type": "String"
+          },
+          {
+            "expression": "$.extracted_errors",
+            "name": "extracted_errors",
+            "type": "String"
+          },
+          {
+            "expression": "$.root_cause_analysis",
+            "name": "root_cause_analysis",
+            "type": "String"
+          }
+        ],
+        "outputs": [
+          {
+            "name": "final_report",
+            "type": "String"
+          }
+        ]
+      },
+      {
+        "name": "OutputNode",
+        "type": "Output",
+        "configuration": {
+          "output": {
+            "expression": "$.final_report"
+          }
+        },
+        "inputs": [
+          {
+            "expression": "$.final_report",
+            "name": "final_report",
+            "type": "String"
+          }
+        ]
+      }
+    ],
+    "connections": [
+      {
+        "name": "InputToAnalyzer",
+        "source": "InputNode",
+        "target": "LogAnalyzer",
+        "configuration": {
+          "data": {
+            "sourceOutput": "document",
+            "targetInput": "log_content"
+          }
+        }
+      },
+      {
+        "name": "AnalyzerToClassifier",
+        "source": "LogAnalyzer",
+        "target": "SeverityClassifier",
+        "configuration": {
+          "data": {
+            "sourceOutput": "analysis_result",
+            "targetInput": "analysis_result"
+          }
+        }
+      },
+      {
+        "name": "AnalyzerToExtractor",
+        "source": "LogAnalyzer",
+        "target": "ErrorExtractor",
+        "configuration": {
+          "data": {
+            "sourceOutput": "analysis_result",
+            "targetInput": "analysis_result"
+          }
+        }
+      },
+      {
+        "name": "ExtractorToKnowledgeBase",
+        "source": "ErrorExtractor",
+        "target": "KnowledgeBaseSearch",
+        "configuration": {
+          "data": {
+            "sourceOutput": "extracted_errors",
+            "targetInput": "query"
+          }
+        }
+      },
+      {
+        "name": "AllToReportGenerator",
+        "source": "KnowledgeBaseSearch",
+        "target": "ReportGenerator",
+        "configuration": {
+          "data": {
+            "sourceOutput": "root_cause_analysis",
+            "targetInput": "root_cause_analysis"
+          }
+        }
+      },
+      {
+        "name": "ReportToOutput",
+        "source": "ReportGenerator",
+        "target": "OutputNode",
+        "configuration": {
+          "data": {
+            "sourceOutput": "final_report",
+            "targetInput": "final_report"
+          }
+        }
+      }
+    ]
+  }
+}
