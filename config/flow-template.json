@@ -142,27 +142,24 @@
       },
       {
         "name": "KnowledgeBaseSearch",
-        "type": "Retrieval",
+        "type": "KnowledgeBase",
         "configuration": {
-          "retrieval": {
-            "serviceConfiguration": {
-              "retrieve": {
-                "knowledgeBaseId": "${KNOWLEDGE_BASE_ID}"
-              }
-            }
+          "knowledgeBase": {
+            "knowledgeBaseId": "${KNOWLEDGE_BASE_ID}",
+            "modelId": "${BEDROCK_MODEL_ID}"
           }
         },
         "inputs": [
           {
             "expression": "$.data",
-            "name": "input",
+            "name": "retrievalQuery",
             "type": "String"
           }
         ],
         "outputs": [
           {
-            "name": "output",
-            "type": "Array"
+            "name": "outputText",
+            "type": "String"
           }
         ]
       },
@@ -286,7 +283,7 @@
         "configuration": {
           "data": {
             "sourceOutput": "modelCompletion",
-            "targetInput": "input"
+            "targetInput": "retrievalQuery"
           }
         }
       },
@@ -297,7 +294,7 @@
         "target": "ReportGenerator",
         "configuration": {
           "data": {
-            "sourceOutput": "output",
+            "sourceOutput": "outputText",
             "targetInput": "root_cause_analysis"
           }
         }
