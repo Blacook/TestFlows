@@ -60,45 +60,6 @@
         ]
       },
       {
-        "name": "SeverityClassifier",
-        "type": "Condition",
-        "configuration": {
-          "condition": {
-            "conditions": [
-              {
-                "name": "Critical",
-                "expression": "$.data.contains('FATAL') || $.data.contains('Critical')"
-              },
-              {
-                "name": "High",
-                "expression": "$.data.contains('ERROR') || $.data.contains('Exception')"
-              },
-              {
-                "name": "Medium",
-                "expression": "$.data.contains('WARN') || $.data.contains('Timeout')"
-              },
-              {
-                "name": "Low",
-                "expression": "true"
-              }
-            ]
-          }
-        },
-        "inputs": [
-          {
-            "expression": "$.data",
-            "name": "data",
-            "type": "String"
-          }
-        ],
-        "outputs": [
-          {
-            "name": "conditionName",
-            "type": "String"
-          }
-        ]
-      },
-      {
         "name": "ErrorExtractor",
         "type": "Prompt",
         "configuration": {
@@ -173,10 +134,9 @@
                 "templateType": "TEXT",
                 "templateConfiguration": {
                   "text": {
-                    "text": "以下の情報を統合して、テスト実行結果の包括的なサマリーレポートをMarkdown形式で生成してください。\n\n## 入力データ\n- **ログ分析結果**: {{analysis_result}}\n- **重要度レベル**: {{severity_level}}\n- **抽出されたエラー**: {{extracted_errors}}\n- **根本原因分析**: {{root_cause_analysis}}\n\n## 出力形式\n以下のMarkdown形式で統一されたレポートを生成してください:\n\n# 🔍 テスト実行サマリーレポート\n\n**生成日時**: [現在時刻]\n**重要度**: {{severity_level}}\n\n## 📊 実行概要\n\n| 項目 | 値 |\n|------|----|\n| 総エラー数 | [分析結果から抽出] |\n| 総警告数 | [分析結果から抽出] |\n| 失敗テスト数 | [分析結果から抽出] |\n| 重要度 | {{severity_level}} |\n\n## 🚨 重要な問題\n\n{{extracted_errors}}\n\n## 🔍 根本原因分析\n\n{{root_cause_analysis}}\n\n## 📈 影響度評価\n\n- **システム影響**: [Critical/High/Medium/Low]\n- **ユーザー影響**: [分析結果に基づく評価]\n- **ビジネス影響**: [推定される影響]\n\n## 💡 推奨アクション\n\n### 🔥 緊急対応（24時間以内）\n- [最優先で対応すべき項目]\n\n### ⚡ 短期対応（1週間以内）\n- [短期で対応すべき項目]\n\n### 🔧 中長期対応（1ヶ月以内）\n- [継続的改善項目]\n\n## 📋 次回テスト時の注意点\n\n- [予防策や監視ポイント]\n\n---\n*このレポートはAmazon Bedrock Flowsによって自動生成されました*",
+                    "text": "以下の情報を統合して、テスト実行結果の包括的なサマリーレポートをMarkdown形式で生成してください。\n\n## 入力データ\n- **ログ分析結果**: {{analysis_result}}\n- **抽出されたエラー**: {{extracted_errors}}\n- **根本原因分析**: {{root_cause_analysis}}\n\n## 出力形式\n以下のMarkdown形式で統一されたレポートを生成してください:\n\n# 🔍 テスト実行サマリーレポート\n\n**生成日時**: [現在時刻]\n\n## 📊 実行概要\n\n| 項目 | 値 |\n|------|----|\n| 総エラー数 | [分析結果から抽出] |\n| 総警告数 | [分析結果から抽出] |\n| 失敗テスト数 | [分析結果から抽出] |\n\n## 🚨 重要な問題\n\n{{extracted_errors}}\n\n## 🔍 根本原因分析\n\n{{root_cause_analysis}}\n\n## 📈 影響度評価\n\n- **システム影響**: [分析結果に基づいてCritical/High/Medium/Lowを判定]\n- **ユーザー影響**: [分析結果に基づく評価]\n- **ビジネス影響**: [推定される影響]\n\n## 💡 推奨アクション\n\n### 🔥 緊急対応（24時間以内）\n- [最優先で対応すべき項目]\n\n### ⚡ 短期対応（1週間以内）\n- [短期で対応すべき項目]\n\n### 🔧 中長期対応（1ヶ月以内）\n- [継続的改善項目]\n\n## 📋 次回テスト時の注意点\n\n- [予防策や監視ポイント]\n\n---\n*このレポートはAmazon Bedrock Flowsによって自動生成されました*",
                     "inputVariables": [
                       {"name": "analysis_result"},
-                      {"name": "severity_level"},
                       {"name": "extracted_errors"},
                       {"name": "root_cause_analysis"}
                     ]
@@ -196,22 +156,17 @@
         },
         "inputs": [
           {
-            "expression": "$.data.analysis",
+            "expression": "$.data",
             "name": "analysis_result",
             "type": "String"
           },
           {
-            "expression": "$.data.severity",
-            "name": "severity_level",
-            "type": "String"
-          },
-          {
-            "expression": "$.data.errors",
+            "expression": "$.data",
             "name": "extracted_errors",
             "type": "String"
           },
           {
-            "expression": "$.data.rootcause",
+            "expression": "$.data",
             "name": "root_cause_analysis",
             "type": "String"
           }
@@ -252,18 +207,6 @@
         }
       },
       {
-        "name": "AnalyzerToClassifier",
-        "type": "Data",
-        "source": "LogAnalyzer",
-        "target": "SeverityClassifier",
-        "configuration": {
-          "data": {
-            "sourceOutput": "modelCompletion",
-            "targetInput": "data"
-          }
-        }
-      },
-      {
         "name": "AnalyzerToExtractor",
         "type": "Data",
         "source": "LogAnalyzer",
@@ -272,6 +215,30 @@
           "data": {
             "sourceOutput": "modelCompletion",
             "targetInput": "analysis_result"
+          }
+        }
+      },
+      {
+        "name": "AnalyzerToReport",
+        "type": "Data",
+        "source": "LogAnalyzer",
+        "target": "ReportGenerator",
+        "configuration": {
+          "data": {
+            "sourceOutput": "modelCompletion",
+            "targetInput": "analysis_result"
+          }
+        }
+      },
+      {
+        "name": "ExtractorToReport",
+        "type": "Data",
+        "source": "ErrorExtractor",
+        "target": "ReportGenerator",
+        "configuration": {
+          "data": {
+            "sourceOutput": "modelCompletion",
+            "targetInput": "extracted_errors"
           }
         }
       },
