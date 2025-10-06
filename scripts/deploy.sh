@@ -8,7 +8,9 @@ set -e
 # 設定ファイルの読み込み
 if [ -f ".env" ]; then
     echo "📋 .env ファイルから設定を読み込み中..."
-    export $(grep -v '^#' .env | xargs)
+    set -a
+    source .env
+    set +a
 else
     echo "⚠️  .env ファイルが見つかりません。"
     echo "📝 .env.example をコピーして .env を作成し、環境に合わせて設定してください。"
@@ -45,46 +47,85 @@ if ! aws bedrock-agent get-knowledge-base --knowledge-base-id "$KNOWLEDGE_BASE_I
     exit 1
 fi
 
-# 1. IAMロールの作成
+# 1. ポリシーファイルの生成
+echo "📝 ポリシーファイルを生成中..."
+bash scripts/generate-policies.sh
+
+# 2. IAMロールの作成
 echo "🔐 IAMロールを作成中..."
 if aws iam get-role --role-name "$EXECUTION_ROLE_NAME" >/dev/null 2>&1; then
-    echo "ロール '$EXECUTION_ROLE_NAME' は既に存在します"
+    echo "⚠️  ロール '$EXECUTION_ROLE_NAME' は既に存在します"
+    echo "⚠️  既存のロールを使用しますが、ポリシーが上書きされる可能性があります"
+    read -p "続行しますか？ (y/N): " confirm
+    if [[ $confirm != [yY] ]]; then
+        echo "❌ デプロイを中止しました"
+        exit 1
+    fi
 else
     aws iam create-role \
       --role-name "$EXECUTION_ROLE_NAME" \
-      --assume-role-policy-document "$(jq -c '.trustPolicy' config/iam-policies.json)" \
+      --assume-role-policy-document file://generated-policies/trust-policy.json \
       --query 'Role.Arn' \
       --output text
     echo "✅ IAMロール '$EXECUTION_ROLE_NAME' を作成しました"
 fi
 
-# IAMポリシーのアタッチ
+# 3. IAMポリシーのアタッチ
 echo "🔒 IAMポリシーをアタッチ中..."
-aws iam put-role-policy \
-  --role-name "$EXECUTION_ROLE_NAME" \
-  --policy-name "$EXECUTION_ROLE_POLICY_NAME" \
-  --policy-document "$(jq -c '.executionPolicy' config/iam-policies.json)"
+if [ ! -d "generated-policies" ]; then
+    echo "❌ generated-policies/ ディレクトリが見つかりません"
+    exit 1
+fi
+
+for policy_file in generated-policies/*-policy.json; do
+    [ -f "$policy_file" ] || continue
+    [ "$policy_file" = "generated-policies/trust-policy.json" ] && continue
+    
+    policy_name="${EXECUTION_ROLE_NAME}-$(basename "$policy_file" .json)"
+    
+    if aws iam get-role-policy --role-name "$EXECUTION_ROLE_NAME" --policy-name "$policy_name" >/dev/null 2>&1; then
+        echo "⚠️  ポリシー '$policy_name' は既に存在します（上書きします）"
+    fi
+    
+    aws iam put-role-policy \
+      --role-name "$EXECUTION_ROLE_NAME" \
+      --policy-name "$policy_name" \
+      --policy-document "file://$policy_file"
+    echo "✅ $policy_name をアタッチしました"
+done
 
 echo "⏳ IAMロールの伝播を待機中（30秒）..."
 sleep 30
 
-# 2. フロー定義ファイルの生成
+# 4. フロー定義ファイルの生成
 echo "📝 フロー定義ファイルを生成中..."
+if [ ! -f "config/flow-template.json" ]; then
+    echo "❌ config/flow-template.json が見つかりません"
+    exit 1
+fi
+
 python3 -c "
 import os
 import sys
+import json
 
-with open('config/flow-template.json', 'r') as f:
-    content = f.read()
-
-for key, value in os.environ.items():
-    content = content.replace(f'\${key}', value).replace(f'\${{{key}}}', value)
-
-with open('flow-definition.json', 'w') as f:
-    f.write(content)
+try:
+    with open('config/flow-template.json', 'r') as f:
+        content = f.read()
+    
+    for key, value in os.environ.items():
+        content = content.replace(f'\${key}', value).replace(f'\${{{key}}}', value)
+    
+    json.loads(content)
+    
+    with open('flow-definition.json', 'w') as f:
+        f.write(content)
+except Exception as e:
+    print(f'Error: {e}', file=sys.stderr)
+    sys.exit(1)
 "
 
-# 3. Bedrock Flowの作成
+# 5. Bedrock Flowの作成
 echo "🔄 Bedrock Flowを作成中..."
 FLOW_ID=$(aws bedrock-agent create-flow \
   --cli-input-json file://flow-definition.json \
@@ -97,23 +138,29 @@ else
     exit 1
 fi
 
-# 4. フローの準備
+# 6. フローの準備
 echo "🔧 フローを準備中..."
 aws bedrock-agent prepare-flow --flow-identifier "$FLOW_ID"
 
-# 5. 環境変数ファイルの更新
+# 7. 環境変数ファイルの更新
 echo "📄 環境変数ファイルを更新中..."
 echo "" >> .env
 echo "# デプロイ結果" >> .env
 echo "FLOW_ID=$FLOW_ID" >> .env
 
-# 6. テスト実行用ファイルの生成
+# 8. テスト実行用ファイルの生成
 echo "📋 テスト実行ファイルを生成中..."
+if [ -f "data/error-patterns.md" ]; then
+    SAMPLE_LOG="Test log sample"
+else
+    SAMPLE_LOG="2024-10-03 ERROR [Test] Sample error"
+fi
+
 cat > test-execution-generated.json << EOF
 {
   "flowId": "$FLOW_ID",
   "inputs": {
-    "log_content": "$(cat test-data/sample-test-log.log | sed 's/"/\\"/g' | tr '\n' '\\n')"
+    "log_content": "$SAMPLE_LOG"
   }
 }
 EOF
