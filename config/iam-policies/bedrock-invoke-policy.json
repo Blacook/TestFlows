@@ -1,0 +1,23 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "BedrockModelInvoke",
+      "Effect": "Allow",
+      "Action": [
+        "bedrock:InvokeModel",
+        "bedrock:InvokeModelWithResponseStream"
+      ],
+      "Resource": [
+        "arn:aws:bedrock:${AWS_REGION}::foundation-model/anthropic.claude-3-haiku*",
+        "arn:aws:bedrock:${AWS_REGION}::foundation-model/anthropic.claude-3-7-sonnet*",
+        "arn:aws:bedrock:${AWS_REGION}::foundation-model/anthropic.claude-sonnet-4*",
+        "arn:aws:bedrock:${AWS_REGION}::foundation-model/anthropic.claude-sonnet-4-5*",
+        "arn:aws:bedrock:${AWS_REGION}::foundation-model/amazon.nova-lite*",
+        "arn:aws:bedrock:${AWS_REGION}::foundation-model/amazon.nova-pro*",
+        "arn:aws:bedrock:${AWS_REGION}::foundation-model/amazon.titan-embed-text*",
+        "arn:aws:bedrock:${AWS_REGION}::foundation-model/amazon.rerank*"
+      ]
+    }
+  ]
+}
