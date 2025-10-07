@@ -49,7 +49,8 @@ fi
 
 # 1. ポリシーファイルの生成
 echo "📝 ポリシーファイルを生成中..."
-bash scripts/generate-policies.sh
+[ -d "generated-policies" ] && rm -rf "generated-policies"
+python3 scripts/generate-template.py config/iam-policies generated-policies
 
 # 2. IAMロールの作成
 echo "🔐 IAMロールを作成中..."
