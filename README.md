@@ -487,12 +487,42 @@ aws bedrock-agent list-knowledge-bases --query 'knowledgeBaseSummaries[*].[knowl
 - `generated-policies/`の生成されたポリシーを確認
 - 必要なリソースARNが正しく設定されているか確認
 
-**問題**: モデルが利用できない
+**問題**: モデルID指定エラー ("The provided model identifier is invalid")
 
+JSON定義でのモデルID指定がエラーになる場合、デプロイ後にFlows GUIで手動設定します:
+
+1. **利用可能なモデルIDを確認**:
 ```bash
-# 利用可能なモデル一覧を確認
-aws bedrock list-foundation-models --query 'modelSummaries[*].[modelId,modelName]' --output table
+# Foundation Model一覧
+aws bedrock list-foundation-models --region ap-northeast-1 --query 'modelSummaries[*].[modelId,modelName]' --output table
+
+# Inference Profile一覧（推奨）
+aws bedrock list-inference-profiles --region ap-northeast-1 --query 'inferenceProfileSummaries[*].inferenceProfileId' --output table
 ```
+
+2. **デプロイを実行**:
+```bash
+bash scripts/deploy.sh
+```
+
+3. **AWS Bedrock Flowsコンソールでモデルを設定**:
+   - Flowsコンソールを開く: `https://console.aws.amazon.com/bedrock/home?region=<REGION>#/flows/<FLOW_ID>`
+   - 「編集」ボタンをクリック
+   - 各Promptノード（LogAnalyzer, ErrorExtractor, QueryGenerator, ReportGenerator）を選択
+   - 「Model」ドロップダウンから利用可能なモデルを選択
+   - Knowledge Baseノードでも同様にモデルIDを選択
+   - 「保存」→「Prepare」でフローを準備
+
+4. **推奨モデル設定（東京リージョン）**:
+   - LogAnalyzer: `apac.anthropic.claude-3-5-sonnet-20241022-v2:0`
+   - ErrorExtractor: `apac.anthropic.claude-3-haiku-20240307-v1:0`
+   - QueryGenerator: `apac.anthropic.claude-3-haiku-20240307-v1:0`
+   - ReportGenerator: `apac.anthropic.claude-3-5-sonnet-20241022-v2:0`
+   - KnowledgeBaseSearch: `apac.anthropic.claude-3-7-sonnet-20250219-v1:0`
+
+**注意**: リージョンによって利用可能なInference Profileのプレフィックスが異なります:
+- 東京リージョン (ap-northeast-1): `apac.`プレフィックス
+- 米国リージョン (us-east-1, us-west-2): `us.`プレフィックス
 
 ### 実行エラー
 
