@@ -4,7 +4,9 @@
 # 生成されたファイル
 flow-definition.json
 test-execution-generated.json
+exported-flow-*
 generated-policies/
+/data
 
 # AWS関連
 .aws/
