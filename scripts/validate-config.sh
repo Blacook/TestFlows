@@ -110,17 +110,19 @@ fi
 echo ""
 echo "📄 設定ファイルの構文チェック中..."
 
-# JSON テンプレートの検証
+# JSON テンプレートの検証（環境変数展開後に検証）
 if [ ! -f "config/flow-template.json" ]; then
     echo "❌ config/flow-template.json が見つかりません"
     exit 1
 fi
 
-if ! jq . config/flow-template.json >/dev/null 2>&1; then
-    echo "❌ フローテンプレートのJSON構文エラーがあります。"
+if python3 scripts/generate-template.py config/flow-template.json /tmp/flow-validation.json 2>/dev/null; then
+    echo "  ✅ フローテンプレート: OK"
+    rm -f /tmp/flow-validation.json
+else
+    echo "  ❌ フローテンプレート: 環境変数展開またはJSON構文エラー"
     exit 1
 fi
-echo "  ✅ フローテンプレート: OK"
 
 # IAM ポリシーテンプレートの検証
 if [ ! -d "config/iam-policies" ]; then
@@ -128,19 +130,14 @@ if [ ! -d "config/iam-policies" ]; then
     exit 1
 fi
 
-policy_error=0
-for policy_file in config/iam-policies/*.json; do
-    [ -f "$policy_file" ] || continue
-    if ! jq . "$policy_file" >/dev/null 2>&1; then
-        echo "  ❌ $(basename "$policy_file"): JSON構文エラー"
-        policy_error=1
-    else
-        echo "  ✅ $(basename "$policy_file"): OK"
-    fi
-done
-
-if [ $policy_error -ne 0 ]; then
-    echo "❌ IAMポリシーテンプレートにエラーがあります。"
+if python3 scripts/generate-template.py config/iam-policies /tmp/policy-validation 2>/dev/null; then
+    for policy_file in /tmp/policy-validation/*.json; do
+        [ -f "$policy_file" ] && echo "  ✅ $(basename "$policy_file"): OK"
+    done
+    rm -rf /tmp/policy-validation
+else
+    echo "  ❌ IAMポリシーテンプレート: 環境変数展開またはJSON構文エラー"
+    rm -rf /tmp/policy-validation
     exit 1
 fi
 
