@@ -111,20 +111,40 @@ echo ""
 echo "📄 設定ファイルの構文チェック中..."
 
 # JSON テンプレートの検証
-if ! envsubst < config/flow-template.json | jq . >/dev/null 2>&1; then
+if [ ! -f "config/flow-template.json" ]; then
+    echo "❌ config/flow-template.json が見つかりません"
+    exit 1
+fi
+
+if ! jq . config/flow-template.json >/dev/null 2>&1; then
     echo "❌ フローテンプレートのJSON構文エラーがあります。"
     exit 1
 fi
 echo "  ✅ フローテンプレート: OK"
 
-# IAM ポリシーの検証
-if ! jq . config/iam-policies.json >/dev/null 2>&1; then
-    echo "❌ IAMポリシーのJSON構文エラーがあります。"
+# IAM ポリシーテンプレートの検証
+if [ ! -d "config/iam-policies" ]; then
+    echo "❌ config/iam-policies/ ディレクトリが見つかりません"
     exit 1
 fi
-echo "  ✅ IAMポリシー: OK"
+
+policy_error=0
+for policy_file in config/iam-policies/*.json; do
+    [ -f "$policy_file" ] || continue
+    if ! jq . "$policy_file" >/dev/null 2>&1; then
+        echo "  ❌ $(basename "$policy_file"): JSON構文エラー"
+        policy_error=1
+    else
+        echo "  ✅ $(basename "$policy_file"): OK"
+    fi
+done
+
+if [ $policy_error -ne 0 ]; then
+    echo "❌ IAMポリシーテンプレートにエラーがあります。"
+    exit 1
+fi
 
 echo ""
 echo "🎉 すべての設定検証が完了しました！"
 echo "💡 デプロイを実行する場合は以下のコマンドを実行してください:"
-echo "   ./scripts/deploy.sh"
+echo "   bash scripts/deploy.sh"
