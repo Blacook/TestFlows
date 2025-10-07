@@ -1,5 +1,50 @@
 # テスト実行ログ RAG 分析フロー（Bedrock 専用構成）
 
+- [テスト実行ログ RAG 分析フロー（Bedrock 専用構成）](#テスト実行ログ-rag-分析フローbedrock-専用構成)
+  - [概要](#概要)
+  - [前提条件](#前提条件)
+  - [アーキテクチャ](#アーキテクチャ)
+    - [ノード構成](#ノード構成)
+  - [スクリプト依存関係](#スクリプト依存関係)
+    - [全スクリプト一覧](#全スクリプト一覧)
+    - [スクリプト詳細](#スクリプト詳細)
+      - [1. `generate-policies.sh` - IAMポリシー生成](#1-generate-policiessh---iamポリシー生成)
+      - [2. `deploy.sh` - メインデプロイスクリプト](#2-deploysh---メインデプロイスクリプト)
+      - [3. `cleanup.sh` - リソース削除（任意実行）](#3-cleanupsh---リソース削除任意実行)
+      - [4. `validate-config.sh` - 設定検証（オプション）](#4-validate-configsh---設定検証オプション)
+      - [5. `export-flow.sh` - Flowエクスポート（任意実行）](#5-export-flowsh---flowエクスポート任意実行)
+  - [クイックスタート](#クイックスタート)
+    - [1. CloudShellでの環境準備](#1-cloudshellでの環境準備)
+    - [2. 設定検証（オプション）](#2-設定検証オプション)
+    - [3. デプロイ](#3-デプロイ)
+  - [テスト実行](#テスト実行)
+    - [方法 1: 生成されたテストファイルを使用](#方法-1-生成されたテストファイルを使用)
+    - [方法 2: 直接ログ内容を指定](#方法-2-直接ログ内容を指定)
+    - [方法 3: AWS コンソール](#方法-3-aws-コンソール)
+    - [実行結果の確認](#実行結果の確認)
+  - [ファイル構成](#ファイル構成)
+    - [主要ファイルの説明](#主要ファイルの説明)
+  - [環境変数設定](#環境変数設定)
+    - [必須設定](#必須設定)
+    - [オプション設定（推奨値）](#オプション設定推奨値)
+  - [入力・出力形式](#入力出力形式)
+    - [入力形式](#入力形式)
+    - [出力形式](#出力形式)
+  - [IAMポリシー設計](#iamポリシー設計)
+    - [最小権限の原則](#最小権限の原則)
+    - [ポリシーテンプレートの環境変数](#ポリシーテンプレートの環境変数)
+  - [Knowledge Base の準備](#knowledge-base-の準備)
+    - [推奨データ構成](#推奨データ構成)
+    - [サンプルデータ](#サンプルデータ)
+  - [トラブルシューティング](#トラブルシューティング)
+    - [デプロイエラー](#デプロイエラー)
+    - [実行エラー](#実行エラー)
+  - [CloudShell利用時の注意事項](#cloudshell利用時の注意事項)
+    - [セッションタイムアウト](#セッションタイムアウト)
+    - [ファイルアップロード](#ファイルアップロード)
+    - [必要なIAM権限](#必要なiam権限)
+
+
 ## 概要
 
 自動テスト実行後に出力される大量のログファイルを AI が分析・要約し、根本原因の推定や特に注目すべき失敗テストをまとめたサマリーレポートを生成する Bedrock Flows です。
@@ -61,13 +106,14 @@ graph TD
 
 ### 全スクリプト一覧
 
-| スクリプト名           | 目的             | 依存                           | 実行タイミング           |
-| ---------------------- | ---------------- | ------------------------------ | ------------------------ |
-| `validate-config.sh`   | 設定検証         | `.env`                         | デプロイ前（オプション） |
-| `generate-policies.sh` | IAMポリシー生成  | `.env`                         | デプロイ時（自動）       |
-| `deploy.sh`            | メインデプロイ   | `generate-policies.sh`, `.env` | 必須                     |
-| `export-flow.sh`       | Flowエクスポート | `.env` (optional)              | 任意（バックアップ時）   |
-| `cleanup.sh`           | リソース削除     | `.env`                         | 任意（削除時）           |
+| ファイル名              | 種類   | 目的                       | 実行タイミング           |
+| ------------------------- | ------ | ---------------------------- | ------------------------ |
+| `validate-config.sh`      | Shell  | 設定検証                   | デプロイ前（オプション） |
+| `generate-policies.sh`    | Shell  | IAMポリシー生成            | デプロイ時（自動）       |
+| `generate-template.py`    | Python | テンプレートからファイル生成 | デプロイ時（自動）       |
+| `deploy.sh`               | Shell  | メインデプロイ             | 必須                     |
+| `export-flow.sh`          | Shell  | Flowエクスポート           | 任意（バックアップ時）   |
+| `cleanup.sh`              | Shell  | リソース削除               | 任意（削除時）           |
 
 ### スクリプト詳細
 
@@ -258,7 +304,8 @@ TestFlows/
 │       ├── knowledge-base-policy.json  # KBアクセス権限（特定KBのみ）
 │       └── cloudwatch-logs-policy.json # Logsアクセス権限（特定ストリームのみ）
 ├── scripts/
-│   ├── generate-policies.sh    # IAMポリシー生成（.env値を使用）
+│   ├── generate-policies.sh    # IAMポリシー生成
+│   ├── generate-template.py    # テンプレート生成ユーティリティ
 │   ├── deploy.sh               # メインデプロイスクリプト
 │   ├── cleanup.sh              # リソース削除スクリプト
 │   ├── validate-config.sh      # 設定検証スクリプト
@@ -288,7 +335,8 @@ TestFlows/
 **スクリプト:**
 
 - `scripts/generate-policies.sh`: .envの値を使ってポリシーファイルを生成
-- `scripts/deploy.sh`: ワンコマンドデプロイスクリプト（generate-policies.shを内部で呼び出し）
+- `scripts/generate-template.py`: テンプレートから環境変数を展開（汎用ユーティリティ）
+- `scripts/deploy.sh`: ワンコマンドデプロイスクリプト
 - `scripts/cleanup.sh`: 作成したリソースの一括削除
 - `scripts/validate-config.sh`: デプロイ前の設定検証
 - `scripts/export-flow.sh`: 既存Flowのエクスポート
@@ -506,25 +554,3 @@ bash scripts/cleanup.sh
 - 生成されたファイル（flow-definition.json, test-execution-generated.json, generated-policies/）
 
 **注意**: Knowledge Base は削除されません。
-
-## コスト見積もり
-
-主なコスト要素:
-
-- **Bedrock Model 呼び出し**: 入力/出力トークン数に応じた従量課金
-- **Knowledge Base 検索**: クエリ数に応じた従量課金
-- **CloudShell**: 無料（AWSアカウントに含まれる）
-
-詳細は[AWS Pricing Calculator](https://calculator.aws)で見積もりを作成してください。
-
-## ライセンス
-
-MIT License
-
-## サポート
-
-問題が発生した場合:
-
-1. `scripts/validate-config.sh`で設定を確認
-2. CloudWatch Logs でエラー詳細を確認
-3. AWS サポートに問い合わせ

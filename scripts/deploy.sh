@@ -72,14 +72,9 @@ fi
 
 # 3. IAMポリシーのアタッチ
 echo "🔒 IAMポリシーをアタッチ中..."
-if [ ! -d "generated-policies" ]; then
-    echo "❌ generated-policies/ ディレクトリが見つかりません"
-    exit 1
-fi
-
 for policy_file in generated-policies/*-policy.json; do
     [ -f "$policy_file" ] || continue
-    [ "$policy_file" = "generated-policies/trust-policy.json" ] && continue
+    [ "$(basename "$policy_file")" = "trust-policy.json" ] && continue
     
     policy_name="${EXECUTION_ROLE_NAME}-$(basename "$policy_file" .json)"
     
@@ -99,31 +94,7 @@ sleep 30
 
 # 4. フロー定義ファイルの生成
 echo "📝 フロー定義ファイルを生成中..."
-if [ ! -f "config/flow-template.json" ]; then
-    echo "❌ config/flow-template.json が見つかりません"
-    exit 1
-fi
-
-python3 -c "
-import os
-import sys
-import json
-
-try:
-    with open('config/flow-template.json', 'r') as f:
-        content = f.read()
-    
-    for key, value in os.environ.items():
-        content = content.replace(f'\${key}', value).replace(f'\${{{key}}}', value)
-    
-    json.loads(content)
-    
-    with open('flow-definition.json', 'w') as f:
-        f.write(content)
-except Exception as e:
-    print(f'Error: {e}', file=sys.stderr)
-    sys.exit(1)
-"
+python3 scripts/generate-template.py config/flow-template.json flow-definition.json
 
 # 5. Bedrock Flowの作成
 echo "🔄 Bedrock Flowを作成中..."
@@ -148,22 +119,6 @@ echo "" >> .env
 echo "# デプロイ結果" >> .env
 echo "FLOW_ID=$FLOW_ID" >> .env
 
-# 8. テスト実行用ファイルの生成
-echo "📋 テスト実行ファイルを生成中..."
-if [ -f "data/error-patterns.md" ]; then
-    SAMPLE_LOG="Test log sample"
-else
-    SAMPLE_LOG="2024-10-03 ERROR [Test] Sample error"
-fi
-
-cat > test-execution-generated.json << EOF
-{
-  "flowId": "$FLOW_ID",
-  "inputs": {
-    "log_content": "$SAMPLE_LOG"
-  }
-}
-EOF
 
 echo "🎉 Bedrock専用フローのデプロイが完了しました！"
 echo ""
