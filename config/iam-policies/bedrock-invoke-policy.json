@@ -12,11 +12,15 @@
         "arn:aws:bedrock:${AWS_REGION}::foundation-model/anthropic.claude-3-haiku*",
         "arn:aws:bedrock:${AWS_REGION}::foundation-model/anthropic.claude-3-7-sonnet*",
         "arn:aws:bedrock:${AWS_REGION}::foundation-model/anthropic.claude-sonnet-4*",
-        "arn:aws:bedrock:${AWS_REGION}::foundation-model/anthropic.claude-sonnet-4-5*",
         "arn:aws:bedrock:${AWS_REGION}::foundation-model/amazon.nova-lite*",
         "arn:aws:bedrock:${AWS_REGION}::foundation-model/amazon.nova-pro*",
-        "arn:aws:bedrock:${AWS_REGION}::foundation-model/amazon.titan-embed-text*",
-        "arn:aws:bedrock:${AWS_REGION}::foundation-model/amazon.rerank*"
+        "arn:aws:bedrock:${AWS_REGION}::foundation-model/amazon.nova-micro*",
+        "arn:aws:bedrock:*::foundation-model/us.anthropic.claude-3-haiku*",
+        "arn:aws:bedrock:*::foundation-model/us.anthropic.claude-3-7-sonnet*",
+        "arn:aws:bedrock:*::foundation-model/us.anthropic.claude-sonnet-4*",
+        "arn:aws:bedrock:*::foundation-model/us.amazon.nova-lite*",
+        "arn:aws:bedrock:*::foundation-model/us.amazon.nova-pro*",
+        "arn:aws:bedrock:*::foundation-model/us.amazon.nova-micro*"
       ]
     }
   ]
